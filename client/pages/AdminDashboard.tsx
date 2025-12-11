@@ -355,6 +355,40 @@ const AdminDashboard: React.FC = () => {
   const [editingProductId, setEditingProductId] = useState<string | null>(null);
   const [editingCategoryId, setEditingCategoryId] = useState<string | null>(null);
   const [editingCategoryImage, setEditingCategoryImage] = useState<string | null>(null);
+  
+  // Field-level error states for inline validation messages
+  const [productFormErrors, setProductFormErrors] = useState<{
+    name?: string;
+    basePrice?: string;
+    category?: string;
+    gstPercentage?: string;
+    instructions?: string;
+  }>({});
+  const [categoryFormErrors, setCategoryFormErrors] = useState<{
+    name?: string;
+    type?: string;
+    image?: string;
+  }>({});
+  const [attributeFormErrors, setAttributeFormErrors] = useState<{
+    attributeName?: string;
+    functionType?: string;
+    inputStyle?: string;
+    primaryEffectType?: string;
+  }>({});
+  const [departmentFormErrors, setDepartmentFormErrors] = useState<{
+    name?: string;
+  }>({});
+  const [sequenceFormErrors, setSequenceFormErrors] = useState<{
+    name?: string;
+    printType?: string;
+    category?: string;
+    selectedDepartments?: string;
+  }>({});
+  const [subCategoryFormErrors, setSubCategoryFormErrors] = useState<{
+    name?: string;
+    category?: string;
+    image?: string;
+  }>({});
 
   // Product form state
   const [productForm, setProductForm] = useState({
@@ -843,6 +877,74 @@ const AdminDashboard: React.FC = () => {
 
     setFilteredSubCategories(filtered);
   }, [subCategories, subCategorySearchQuery]);
+
+  // Auto-select single option in dropdowns
+  useEffect(() => {
+    // Auto-select category if only one option available (excluding placeholder)
+    if (selectedType && filteredCategoriesByType.length === 1 && !productForm.category) {
+      const singleCategory = filteredCategoriesByType[0];
+      if (singleCategory && singleCategory._id) {
+        setProductForm({
+          ...productForm,
+          category: singleCategory._id,
+        });
+        // Trigger category selection logic
+        setSelectedCategoryPath([singleCategory._id]);
+        fetchCategoryChildren(singleCategory._id);
+      }
+    }
+  }, [selectedType, filteredCategoriesByType, productForm.category]);
+
+  // Auto-select subcategory if only one option available
+  useEffect(() => {
+    if (productForm.category && categoryChildrenMap[productForm.category]?.length === 1 && !productForm.subcategory) {
+      const singleSubcategory = categoryChildrenMap[productForm.category][0];
+      if (singleSubcategory && singleSubcategory._id) {
+        setProductForm({
+          ...productForm,
+          subcategory: singleSubcategory._id,
+        });
+      }
+    }
+  }, [productForm.category, categoryChildrenMap, productForm.subcategory]);
+
+  // Auto-select department in sequence form if only one available
+  useEffect(() => {
+    const enabledDepartments = departments.filter((d: any) => d.isEnabled);
+    if (enabledDepartments.length === 1 && sequenceForm.selectedDepartments.length === 0) {
+      const singleDept = enabledDepartments[0];
+      if (singleDept && singleDept._id) {
+        setSequenceForm({
+          ...sequenceForm,
+          selectedDepartments: [singleDept._id],
+        });
+      }
+    }
+  }, [departments, sequenceForm.selectedDepartments.length]);
+
+  // Auto-select category in sequence form if only one available
+  useEffect(() => {
+    if (sequenceForm.printType) {
+      const filtered = categories.filter((cat) => {
+        if (sequenceForm.printType === "digital") {
+          return cat.type === "Digital" || cat.type === "digital";
+        } else if (sequenceForm.printType === "bulk") {
+          return cat.type === "Bulk" || cat.type === "bulk";
+        }
+        return false;
+      }).filter(cat => !cat.parent);
+      
+      if (filtered.length === 1 && !sequenceForm.category) {
+        const singleCategory = filtered[0];
+        if (singleCategory && singleCategory._id) {
+          setSequenceForm({
+            ...sequenceForm,
+            category: singleCategory._id,
+          });
+        }
+      }
+    }
+  }, [sequenceForm.printType, categories, sequenceForm.category]);
 
   const getAuthHeaders = (includeContentType = false) => {
     const token = localStorage.getItem("token");
@@ -2570,18 +2672,30 @@ const AdminDashboard: React.FC = () => {
       // Convert simplified form to full structure
       const fullAttributeType = convertFormToAttributeType();
       
-      // Validate required fields
+      // Validate required fields with auto-scroll
       if (!fullAttributeType.attributeName) {
-        throw new Error("Attribute name is required");
+        setError("Attribute name is required");
+        setLoading(false);
+        scrollToInvalidField("attributeName", "attribute-name");
+        return;
       }
       if (!fullAttributeType.functionType) {
-        throw new Error("Function type is required");
+        setError("Function type is required");
+        setLoading(false);
+        scrollToInvalidField("functionType", "attribute-functionType");
+        return;
       }
       if (!fullAttributeType.inputStyle) {
-        throw new Error("Input style is required");
+        setError("Input style is required");
+        setLoading(false);
+        scrollToInvalidField("inputStyle", "attribute-inputStyle");
+        return;
       }
       if (!fullAttributeType.primaryEffectType) {
-        throw new Error("Primary effect type is required");
+        setError("Primary effect type is required");
+        setLoading(false);
+        scrollToInvalidField("primaryEffectType", "attribute-primaryEffectType");
+        return;
       }
       
       const payload = {
@@ -2832,8 +2946,15 @@ const AdminDashboard: React.FC = () => {
     setSuccess(null);
 
     try {
+      // Clear previous errors
+      setDepartmentFormErrors({});
+      setError(null);
+      
       if (!departmentForm.name.trim()) {
-        throw new Error("Department name is required");
+        setDepartmentFormErrors({ name: "Department name is required" });
+        setLoading(false);
+        scrollToInvalidField("name", "department-name");
+        return;
       }
 
       const url = editingDepartmentId
@@ -2951,19 +3072,41 @@ const AdminDashboard: React.FC = () => {
     setSuccess(null);
 
     try {
+      // Clear previous errors
+      setSequenceFormErrors({});
+      setError(null);
+      
+      let hasErrors = false;
+      const errors: typeof sequenceFormErrors = {};
+      
       if (!sequenceForm.name.trim()) {
-        throw new Error("Sequence name is required");
+        errors.name = "Sequence name is required";
+        hasErrors = true;
       }
       if (!sequenceForm.printType) {
-        throw new Error("Print type is required");
+        errors.printType = "Print type is required";
+        hasErrors = true;
       }
       // Require category for both digital and bulk print
       if (!sequenceForm.category) {
-        throw new Error("Category is required");
+        errors.category = "Category is required";
+        hasErrors = true;
       }
       // Subcategory is optional for both digital and bulk print
       if (!sequenceForm.selectedDepartments || sequenceForm.selectedDepartments.length === 0) {
-        throw new Error("At least one department must be selected");
+        errors.selectedDepartments = "At least one department must be selected";
+        hasErrors = true;
+      }
+      
+      if (hasErrors) {
+        setSequenceFormErrors(errors);
+        setLoading(false);
+        const firstErrorField = Object.keys(errors)[0];
+        if (firstErrorField === 'name') scrollToInvalidField("name", "sequence-name");
+        else if (firstErrorField === 'printType') scrollToInvalidField("printType", "sequence-printType");
+        else if (firstErrorField === 'category') scrollToInvalidField("category", "sequence-category");
+        else if (firstErrorField === 'selectedDepartments') scrollToInvalidField("selectedDepartments", "sequence-departments");
+        return;
       }
 
       const url = editingSequenceId
@@ -3186,37 +3329,37 @@ const AdminDashboard: React.FC = () => {
     setSuccess(null);
 
     try {
-      // Validate required fields with auto-scroll
+      // Clear previous errors
+      setProductFormErrors({});
+      setError(null);
+      
+      // Validate required fields with auto-scroll and field-level errors
+      let hasErrors = false;
+      const errors: typeof productFormErrors = {};
+      
       if (!productForm.name || !productForm.name.trim()) {
-        setError("Product name is required");
-        setLoading(false);
-        scrollToInvalidField("name", "product-name");
-        return;
+        errors.name = "Product name is required";
+        hasErrors = true;
       }
 
       if (!productForm.basePrice || !productForm.basePrice.toString().trim()) {
-        setError("Base price is required");
-        setLoading(false);
-        scrollToInvalidField("basePrice", "product-basePrice");
-        return;
+        errors.basePrice = "Base price is required";
+        hasErrors = true;
       }
 
       // Validate category (required)
       if (!productForm.category) {
-        setError("Please select a category");
-        setLoading(false);
-        scrollToInvalidField("category", "product-category");
-        return;
+        errors.category = "Please select a category";
+        hasErrors = true;
       }
 
       // Get type from selected category
       const selectedCategory = categories.find(cat => cat._id === productForm.category);
-      if (!selectedCategory) {
-        setError("Selected category not found. Please select a valid category.");
-        setLoading(false);
-        return;
+      if (!selectedCategory && productForm.category) {
+        errors.category = "Selected category not found. Please select a valid category.";
+        hasErrors = true;
       }
-      const categoryType = selectedCategory.type;
+      const categoryType = selectedCategory?.type;
 
       // Category ID - always use the selected category (parent category)
       // If subcategory is selected, category should be the parent category
@@ -3227,16 +3370,26 @@ const AdminDashboard: React.FC = () => {
 
       // Validate GST Percentage (required field marked with *)
       if (!productForm.gstPercentage || !productForm.gstPercentage.toString().trim()) {
-        setError("GST % is required for invoice calculation");
-        setLoading(false);
-        scrollToInvalidField("gstPercentage", "product-gstPercentage");
-        return;
+        errors.gstPercentage = "GST % is required for invoice calculation";
+        hasErrors = true;
       }
 
       // Validate Instructions (required field marked with *)
       if (!productForm.instructions || !productForm.instructions.trim()) {
-        setError("Instructions are required");
+        errors.instructions = "Instructions are required";
+        hasErrors = true;
+      }
+      
+      if (hasErrors) {
+        setProductFormErrors(errors);
         setLoading(false);
+        // Scroll to first error field
+        const firstErrorField = Object.keys(errors)[0];
+        if (firstErrorField === 'name') scrollToInvalidField("name", "product-name");
+        else if (firstErrorField === 'basePrice') scrollToInvalidField("basePrice", "product-basePrice");
+        else if (firstErrorField === 'category') scrollToInvalidField("category", "product-category");
+        else if (firstErrorField === 'gstPercentage') scrollToInvalidField("gstPercentage", "product-gstPercentage");
+        else if (firstErrorField === 'instructions') scrollToInvalidField("instructions", "product-instructions");
         return;
       }
 
@@ -3939,11 +4092,24 @@ const AdminDashboard: React.FC = () => {
     setSuccess(null);
 
     try {
-      // Validate form fields with auto-scroll
+      // Clear previous errors
+      setCategoryFormErrors({});
+      setError(null);
+      
+      // Validate form fields with auto-scroll and field-level errors
+      let hasErrors = false;
+      const errors: typeof categoryFormErrors = {};
+      
       if (!categoryForm.name || categoryForm.name.trim() === "") {
-        setError("Category name is required.");
+        errors.name = "Category name is required";
+        hasErrors = true;
+      }
+      
+      if (hasErrors) {
+        setCategoryFormErrors(errors);
         setLoading(false);
-        scrollToInvalidField("name", "category-name");
+        const firstErrorField = Object.keys(errors)[0];
+        if (firstErrorField === 'name') scrollToInvalidField("name", "category-name");
         return;
       }
 
@@ -3958,9 +4124,15 @@ const AdminDashboard: React.FC = () => {
 
         // Image is required when creating subcategory (not when updating)
         if (!editingCategoryId && !categoryForm.image) {
-          setError("Subcategory image is required. Please upload an image.");
+          errors.image = "Subcategory image is required. Please upload an image";
+          hasErrors = true;
+        }
+        
+        if (hasErrors) {
+          setCategoryFormErrors(errors);
           setLoading(false);
-          scrollToInvalidField("image", "category-image");
+          const firstErrorField = Object.keys(errors)[0];
+          if (firstErrorField === 'image') scrollToInvalidField("image", "category-image");
           return;
         }
 
@@ -4127,23 +4299,36 @@ const AdminDashboard: React.FC = () => {
     setSuccess(null);
 
     try {
-      // Validate form fields
+      // Clear previous errors
+      setSubCategoryFormErrors({});
+      setError(null);
+      
+      let hasErrors = false;
+      const errors: typeof subCategoryFormErrors = {};
+      
       if (!subCategoryForm.name || subCategoryForm.name.trim() === "") {
-        setError("Subcategory name is required.");
-        setLoading(false);
-        return;
+        errors.name = "Subcategory name is required";
+        hasErrors = true;
       }
 
       if (!subCategoryForm.category || subCategoryForm.category === "pending") {
-        setError("Parent category is required.");
-        setLoading(false);
-        return;
+        errors.category = "Parent category is required";
+        hasErrors = true;
       }
 
       // Image is required when creating (not when updating)
       if (!editingSubCategoryId && !subCategoryForm.image) {
-        setError("Subcategory image is required. Please upload an image.");
+        errors.image = "Subcategory image is required. Please upload an image";
+        hasErrors = true;
+      }
+      
+      if (hasErrors) {
+        setSubCategoryFormErrors(errors);
         setLoading(false);
+        const firstErrorField = Object.keys(errors)[0];
+        if (firstErrorField === 'name') scrollToInvalidField("name", "subcategory-name");
+        else if (firstErrorField === 'category') scrollToInvalidField("category", "subcategory-category");
+        else if (firstErrorField === 'image') scrollToInvalidField("image", "subcategory-image");
         return;
       }
 
@@ -4831,14 +5016,25 @@ const AdminDashboard: React.FC = () => {
                       type="text"
                       required
                       value={productForm.name}
-                      onChange={(e) =>
-                        setProductForm({ ...productForm, name: e.target.value })
-                      }
-                      className="w-full px-4 py-2 border border-cream-300 rounded-lg focus:ring-2 focus:ring-cream-500 focus:border-cream-500"
+                      onChange={(e) => {
+                        setProductForm({ ...productForm, name: e.target.value });
+                        if (productFormErrors.name) {
+                          setProductFormErrors({ ...productFormErrors, name: undefined });
+                        }
+                      }}
+                      className={`w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-cream-500 focus:border-cream-500 ${
+                        productFormErrors.name ? 'border-red-300 bg-red-50' : 'border-cream-300'
+                      }`}
                       placeholder="e.g., Glossy Business Cards - Premium"
                       maxLength={100}
                     />
-                    {productForm.name && productForm.name.length > 80 && (
+                    {productFormErrors.name && (
+                      <p className="text-xs text-red-600 mt-1 flex items-center gap-1">
+                        <AlertCircle size={12} />
+                        {productFormErrors.name}
+                      </p>
+                    )}
+                    {productForm.name && productForm.name.length > 80 && !productFormErrors.name && (
                       <p className="text-xs text-yellow-600 mt-1">
                         {100 - productForm.name.length} characters remaining
                       </p>
@@ -5357,15 +5553,26 @@ const AdminDashboard: React.FC = () => {
                         step="0.00001"
                         min="0"
                         value={productForm.basePrice}
-                        onChange={(e) =>
+                        onChange={(e) => {
                           setProductForm({
                             ...productForm,
                             basePrice: e.target.value,
-                          })
-                        }
-                        className="w-full pl-8 pr-4 py-2 border border-cream-300 rounded-lg focus:ring-2 focus:ring-cream-500 focus:border-cream-500"
+                          });
+                          if (productFormErrors.basePrice) {
+                            setProductFormErrors({ ...productFormErrors, basePrice: undefined });
+                          }
+                        }}
+                        className={`w-full pl-8 pr-4 py-2 border rounded-lg focus:ring-2 focus:ring-cream-500 focus:border-cream-500 ${
+                          productFormErrors.basePrice ? 'border-red-300 bg-red-50' : 'border-cream-300'
+                        }`}
                         placeholder="0.00000"
                       />
+                      {productFormErrors.basePrice && (
+                        <p className="text-xs text-red-600 mt-1 flex items-center gap-1">
+                          <AlertCircle size={12} />
+                          {productFormErrors.basePrice}
+                        </p>
+                      )}
                     </div>
                     {productForm.basePrice && parseFloat(productForm.basePrice) < 0 && (
                       <p className="text-xs text-red-600 mt-1">Price cannot be negative</p>
@@ -5447,6 +5654,9 @@ const AdminDashboard: React.FC = () => {
                               category: value,
                               subcategory: "", // Reset subcategory when category changes
                             });
+                            if (productFormErrors.category) {
+                              setProductFormErrors({ ...productFormErrors, category: undefined });
+                            }
                             
                             // Immediately fetch children for this category
                             await fetchCategoryChildren(value);
@@ -5476,6 +5686,12 @@ const AdminDashboard: React.FC = () => {
                         ]}
                         className="w-full"
                       />
+                      {productFormErrors.category && (
+                        <p className="text-xs text-red-600 mt-1 flex items-center gap-1">
+                          <AlertCircle size={12} />
+                          {productFormErrors.category}
+                        </p>
+                      )}
                       {!productForm.category && selectedType && (
                         <p className="mt-1 text-xs text-amber-600 flex items-center gap-1">
                           <AlertCircle size={12} />
@@ -6127,15 +6343,26 @@ const AdminDashboard: React.FC = () => {
                       min="0"
                       max="100"
                       value={productForm.gstPercentage}
-                      onChange={(e) =>
+                      onChange={(e) => {
                         setProductForm({
                           ...productForm,
                           gstPercentage: e.target.value,
-                        })
-                      }
-                      className="w-full px-4 py-2 border border-cream-300 rounded-lg focus:ring-2 focus:ring-cream-500 focus:border-cream-500"
+                        });
+                        if (productFormErrors.gstPercentage) {
+                          setProductFormErrors({ ...productFormErrors, gstPercentage: undefined });
+                        }
+                      }}
+                      className={`w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-cream-500 focus:border-cream-500 ${
+                        productFormErrors.gstPercentage ? 'border-red-300 bg-red-50' : 'border-cream-300'
+                      }`}
                       placeholder="e.g., 18"
                     />
+                    {productFormErrors.gstPercentage && (
+                      <p className="text-xs text-red-600 mt-1 flex items-center gap-1">
+                        <AlertCircle size={12} />
+                        {productFormErrors.gstPercentage}
+                      </p>
+                    )}
                     <p className="text-xs text-red-600 mt-1 font-medium">CRITICAL: Required for invoice calculation</p>
                   </div>
                 </div>
@@ -6181,17 +6408,30 @@ const AdminDashboard: React.FC = () => {
                       Instructions *
                     </label>
                     <textarea
+                      id="product-instructions"
+                      name="instructions"
                       value={productForm.instructions}
-                      onChange={(e) =>
+                      onChange={(e) => {
                         setProductForm({
                           ...productForm,
                           instructions: e.target.value,
-                        })
-                      }
+                        });
+                        if (productFormErrors.instructions) {
+                          setProductFormErrors({ ...productFormErrors, instructions: undefined });
+                        }
+                      }}
                       rows={6}
-                      className="w-full px-4 py-2 border border-cream-300 rounded-lg focus:ring-2 focus:ring-cream-500 focus:border-cream-500"
+                      className={`w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-cream-500 focus:border-cream-500 ${
+                        productFormErrors.instructions ? 'border-red-300 bg-red-50' : 'border-cream-300'
+                      }`}
                       placeholder="Example: Maximum file size: 10 MB. Files must be in PNG or PDF format only. CDR and JPG files are not accepted. Required dimensions: 3000 × 2000 pixels. Please ensure all text is converted to outlines before uploading."
                     />
+                    {productFormErrors.instructions && (
+                      <p className="text-xs text-red-600 mt-1 flex items-center gap-1">
+                        <AlertCircle size={12} />
+                        {productFormErrors.instructions}
+                      </p>
+                    )}
                     <p className="text-xs text-yellow-700 mt-2 font-medium">
                       ⚠️ These instructions will be displayed to customers with a disclaimer that the company is not responsible if instructions are not followed.
                     </p>
@@ -6808,6 +7048,8 @@ const AdminDashboard: React.FC = () => {
                               Attribute Name * <span className="text-xs text-cream-500 font-normal">(What customers will see)</span>
                             </label>
                             <input
+                              id="attribute-name"
+                              name="attributeName"
                               type="text"
                               value={attributeTypeForm.attributeName}
                               onChange={(e) => setAttributeTypeForm({ ...attributeTypeForm, attributeName: e.target.value })}
@@ -6821,6 +7063,8 @@ const AdminDashboard: React.FC = () => {
                               How Customers Select This * <span className="text-xs text-cream-500 font-normal">(Input method)</span>
                             </label>
                             <select
+                              id="attribute-inputStyle"
+                              name="inputStyle"
                               value={attributeTypeForm.inputStyle}
                               onChange={(e) => setAttributeTypeForm({ ...attributeTypeForm, inputStyle: e.target.value })}
                               className="w-full px-3 py-2 border border-cream-300 rounded-lg focus:ring-2 focus:ring-cream-900 focus:border-transparent"
@@ -7392,14 +7636,12 @@ const AdminDashboard: React.FC = () => {
                     }
                     setCategoryForm({ ...categoryForm, name: newName, slug: newSlug });
                     setError(null); // Clear error when user starts typing
-                  }}
-                  onBlur={() => {
-                    if (!categoryForm.name.trim()) {
-                      setError("Category name is required.");
+                    if (categoryFormErrors.name) {
+                      setCategoryFormErrors({ ...categoryFormErrors, name: undefined });
                     }
                   }}
                   className={`w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-cream-500 focus:border-cream-500 ${
-                    (error && !categoryForm.name.trim()) || (!categoryForm.name.trim() && categoryForm.name !== "") ? 'border-red-300 bg-red-50' : 'border-cream-300'
+                    categoryFormErrors.name ? 'border-red-300 bg-red-50' : 'border-cream-300'
                   }`}
                   placeholder="Enter category name"
                 />
@@ -7461,6 +7703,9 @@ const AdminDashboard: React.FC = () => {
                       parent: ""
                     });
                     setError(null); // Clear error when user selects type
+                    if (categoryFormErrors.type) {
+                      setCategoryFormErrors({ ...categoryFormErrors, type: undefined });
+                    }
                     // Refresh available parent categories filtered by type
                     // Use setTimeout to ensure state is updated before fetching
                     setTimeout(() => {
@@ -7477,6 +7722,12 @@ const AdminDashboard: React.FC = () => {
                   ]}
                   className="w-full"
                 />
+                {categoryFormErrors.type && (
+                  <p className="text-xs text-red-600 mt-1 flex items-center gap-1">
+                    <AlertCircle size={12} />
+                    {categoryFormErrors.type}
+                  </p>
+                )}
                 {error && !categoryForm.type && (
                   <p className="mt-1 text-xs text-red-600">Category type is required</p>
                 )}
@@ -7642,6 +7893,8 @@ const AdminDashboard: React.FC = () => {
                   Subcategory Name <span className="text-red-500">*</span>
                 </label>
                 <input
+                  id="subcategory-name"
+                  name="name"
                   type="text"
                   required
                   value={subCategoryForm.name}
@@ -7655,12 +7908,21 @@ const AdminDashboard: React.FC = () => {
                     }
                     setSubCategoryForm({ ...subCategoryForm, name: newName, slug: newSlug });
                     setError(null);
+                    if (subCategoryFormErrors.name) {
+                      setSubCategoryFormErrors({ ...subCategoryFormErrors, name: undefined });
+                    }
                   }}
                   className={`w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-cream-500 focus:border-cream-500 ${
-                    error && !subCategoryForm.name.trim() ? 'border-red-300 bg-red-50' : 'border-cream-300'
+                    subCategoryFormErrors.name ? 'border-red-300 bg-red-50' : 'border-cream-300'
                   }`}
                   placeholder="Enter subcategory name"
                 />
+                {subCategoryFormErrors.name && (
+                  <p className="text-xs text-red-600 mt-1 flex items-center gap-1">
+                    <AlertCircle size={12} />
+                    {subCategoryFormErrors.name}
+                  </p>
+                )}
               </div>
 
               <div>
@@ -7716,6 +7978,7 @@ const AdminDashboard: React.FC = () => {
                     Parent Category <span className="text-red-500">*</span>
                   </label>
                   <ReviewFilterDropdown
+                    id="subcategory-category"
                     label="Select Category"
                     value={subCategoryForm.category === "pending" ? "" : (subCategoryForm.category || "")}
                     onChange={(value) => {
@@ -7724,6 +7987,9 @@ const AdminDashboard: React.FC = () => {
                         category: (value || "") as string,
                       });
                       setError(null);
+                      if (subCategoryFormErrors.category) {
+                        setSubCategoryFormErrors({ ...subCategoryFormErrors, category: undefined });
+                      }
                     }}
                     options={[
                       { value: "", label: "Select Category" },
@@ -7740,6 +8006,12 @@ const AdminDashboard: React.FC = () => {
                     ]}
                     className="w-full"
                   />
+                  {subCategoryFormErrors.category && (
+                    <p className="text-xs text-red-600 mt-1 flex items-center gap-1">
+                      <AlertCircle size={12} />
+                      {subCategoryFormErrors.category}
+                    </p>
+                  )}
                   {error && (!subCategoryForm.category || subCategoryForm.category === "pending") && subCategoryForm.type && (
                     <p className="mt-1 text-xs text-red-600">Parent category is required</p>
                   )}
@@ -9749,15 +10021,28 @@ const AdminDashboard: React.FC = () => {
                         Department Name *
                       </label>
                       <input
+                        id="department-name"
+                        name="name"
                         type="text"
                         required
                         value={departmentForm.name}
-                        onChange={(e) =>
-                          setDepartmentForm({ ...departmentForm, name: e.target.value })
-                        }
-                        className="w-full px-4 py-2 border border-cream-300 rounded-lg focus:ring-2 focus:ring-cream-500 focus:border-cream-500"
+                        onChange={(e) => {
+                          setDepartmentForm({ ...departmentForm, name: e.target.value });
+                          if (departmentFormErrors.name) {
+                            setDepartmentFormErrors({ ...departmentFormErrors, name: undefined });
+                          }
+                        }}
+                        className={`w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-cream-500 focus:border-cream-500 ${
+                          departmentFormErrors.name ? 'border-red-300 bg-red-50' : 'border-cream-300'
+                        }`}
                         placeholder="e.g., Prepress, Digital Printing"
                       />
+                      {departmentFormErrors.name && (
+                        <p className="text-xs text-red-600 mt-1 flex items-center gap-1">
+                          <AlertCircle size={12} />
+                          {departmentFormErrors.name}
+                        </p>
+                      )}
                     </div>
 
                   </div>
@@ -10002,15 +10287,28 @@ const AdminDashboard: React.FC = () => {
                       Sequence Name *
                     </label>
                     <input
+                      id="sequence-name"
+                      name="name"
                       type="text"
                       required
                       value={sequenceForm.name}
-                      onChange={(e) =>
-                        setSequenceForm({ ...sequenceForm, name: e.target.value })
-                      }
-                      className="w-full px-4 py-2 border border-cream-300 rounded-lg focus:ring-2 focus:ring-cream-500 focus:border-cream-500"
+                      onChange={(e) => {
+                        setSequenceForm({ ...sequenceForm, name: e.target.value });
+                        if (sequenceFormErrors.name) {
+                          setSequenceFormErrors({ ...sequenceFormErrors, name: undefined });
+                        }
+                      }}
+                      className={`w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-cream-500 focus:border-cream-500 ${
+                        sequenceFormErrors.name ? 'border-red-300 bg-red-50' : 'border-cream-300'
+                      }`}
                       placeholder="e.g., Standard Printing Sequence"
                     />
+                    {sequenceFormErrors.name && (
+                      <p className="text-xs text-red-600 mt-1 flex items-center gap-1">
+                        <AlertCircle size={12} />
+                        {sequenceFormErrors.name}
+                      </p>
+                    )}
                   </div>
 
                   <div>
@@ -10018,6 +10316,7 @@ const AdminDashboard: React.FC = () => {
                       Print Type *
                     </label>
                     <ReviewFilterDropdown
+                      id="sequence-printType"
                       label="Select Print Type"
                       value={sequenceForm.printType}
                       onChange={(value) => {
@@ -10027,6 +10326,9 @@ const AdminDashboard: React.FC = () => {
                           category: "", // Reset category when print type changes
                           subcategory: "", // Reset subcategory when print type changes
                         });
+                        if (sequenceFormErrors.printType) {
+                          setSequenceFormErrors({ ...sequenceFormErrors, printType: undefined });
+                        }
                       }}
                       options={[
                         { value: "", label: "Select Print Type" },
@@ -10035,6 +10337,12 @@ const AdminDashboard: React.FC = () => {
                       ]}
                       className="w-full"
                     />
+                    {sequenceFormErrors.printType && (
+                      <p className="text-xs text-red-600 mt-1 flex items-center gap-1">
+                        <AlertCircle size={12} />
+                        {sequenceFormErrors.printType}
+                      </p>
+                    )}
                   </div>
 
                   {(sequenceForm.printType === "digital" || sequenceForm.printType === "bulk") && (
@@ -10045,6 +10353,7 @@ const AdminDashboard: React.FC = () => {
                             Category *
                           </label>
                           <ReviewFilterDropdown
+                            id="sequence-category"
                             label="Select Category"
                             value={sequenceForm.category}
                             onChange={(value) => {
@@ -10053,6 +10362,9 @@ const AdminDashboard: React.FC = () => {
                                 category: value,
                                 subcategory: "", // Reset subcategory when category changes
                               });
+                              if (sequenceFormErrors.category) {
+                                setSequenceFormErrors({ ...sequenceFormErrors, category: undefined });
+                              }
                             }}
                             options={[
                               { value: "", label: "Select Category" },
@@ -10076,6 +10388,12 @@ const AdminDashboard: React.FC = () => {
                             ]}
                             className="w-full"
                           />
+                          {sequenceFormErrors.category && (
+                            <p className="text-xs text-red-600 mt-1 flex items-center gap-1">
+                              <AlertCircle size={12} />
+                              {sequenceFormErrors.category}
+                            </p>
+                          )}
                         </div>
 
                         <div>
@@ -10112,7 +10430,7 @@ const AdminDashboard: React.FC = () => {
                     </>
                   )}
 
-                  <div>
+                  <div id="sequence-departments">
                     <label className="block text-sm font-medium text-cream-900 mb-2">
                       Select Departments (in order) *
                     </label>

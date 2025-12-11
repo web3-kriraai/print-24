@@ -6,6 +6,7 @@ import BackButton from "../components/BackButton";
 import { Star, Send, Filter, X } from "lucide-react";
 import { ReviewFilterDropdown } from "../components/ReviewFilterDropdown";
 import { API_BASE_URL_WITH_API } from "../lib/apiConfig";
+import { scrollToInvalidField } from "../lib/validationUtils";
 
 interface Review {
   _id: string;
@@ -85,16 +86,24 @@ const Reviews: React.FC = () => {
   const handleSubmitReview = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    // Validate form
-    if (!reviewForm.comment.trim()) {
-      setSubmitMessage({ type: "error", text: "Please enter a comment" });
-      setTimeout(() => setSubmitMessage({ type: null, text: "" }), 3000);
-      return;
+    // Validate form with auto-scroll
+    const validationErrors: string[] = [];
+    
+    if (!reviewForm.userName.trim()) {
+      validationErrors.push("Please enter your name");
+      scrollToInvalidField("userName", "userName");
     }
 
-    if (!reviewForm.userName.trim()) {
-      setSubmitMessage({ type: "error", text: "Please enter your name" });
-      setTimeout(() => setSubmitMessage({ type: null, text: "" }), 3000);
+    if (!reviewForm.comment.trim()) {
+      validationErrors.push("Please enter a comment");
+      if (validationErrors.length === 1) {
+        scrollToInvalidField("comment", "comment");
+      }
+    }
+
+    if (validationErrors.length > 0) {
+      setSubmitMessage({ type: "error", text: validationErrors.join(". ") });
+      setTimeout(() => setSubmitMessage({ type: null, text: "" }), 5000);
       return;
     }
 
@@ -239,6 +248,8 @@ const Reviews: React.FC = () => {
                   Your Name *
                 </label>
                 <input
+                  id="userName"
+                  name="userName"
                   type="text"
                   value={reviewForm.userName}
                   onChange={(e) =>
@@ -282,6 +293,8 @@ const Reviews: React.FC = () => {
                   Your Review *
                 </label>
                 <textarea
+                  id="comment"
+                  name="comment"
                   value={reviewForm.comment}
                   onChange={(e) =>
                     setReviewForm({ ...reviewForm, comment: e.target.value })

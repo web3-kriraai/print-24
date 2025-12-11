@@ -11,6 +11,7 @@ import {
   Loader,
 } from "lucide-react";
 import { API_BASE_URL_WITH_API } from "../lib/apiConfig";
+import { scrollToInvalidField } from "../lib/validationUtils";
 
 interface LoginResponse {
   success: boolean;
@@ -67,6 +68,13 @@ const Login: React.FC = () => {
     }
 
     setErrors(newErrors);
+    
+    // Auto-scroll to first invalid field
+    if (Object.keys(newErrors).length > 0) {
+      const firstErrorField = Object.keys(newErrors)[0];
+      scrollToInvalidField(firstErrorField, firstErrorField);
+    }
+    
     return Object.keys(newErrors).length === 0;
   };
 
