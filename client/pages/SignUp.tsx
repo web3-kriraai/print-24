@@ -4,6 +4,7 @@ import { motion } from "framer-motion";
 import BackButton from "../components/BackButton";
 import { Printer, User, Mail, Lock, ArrowRight, Loader } from "lucide-react";
 import { API_BASE_URL_WITH_API } from "../lib/apiConfig";
+import { scrollToInvalidField } from "../lib/validationUtils";
 
 const SignUp: React.FC = () => {
   const navigate = useNavigate();
@@ -55,6 +56,13 @@ const SignUp: React.FC = () => {
     }
 
     setErrors(newErrors);
+    
+    // Auto-scroll to first invalid field
+    if (Object.keys(newErrors).length > 0) {
+      const firstErrorField = Object.keys(newErrors)[0];
+      scrollToInvalidField(firstErrorField, firstErrorField);
+    }
+    
     return Object.keys(newErrors).length === 0;
   };
 
