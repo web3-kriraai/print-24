@@ -113,6 +113,12 @@ import {
   departmentAction,
 } from "../controllers/departmentActionController.js";
 
+/* GEOCODING CONTROLLERS */
+import {
+  reverseGeocode,
+  searchGeocode,
+} from "../controllers/geocodingController.js";
+
 const router = express.Router();
 
 /* =====================================
@@ -329,5 +335,15 @@ router.get("/sequences/subcategory/:subcategoryId", getSequenceBySubcategory);
 router.get("/sequences/:id", getSingleSequence);
 router.put("/sequences/:id", authMiddleware, adminAuth, updateSequence);
 router.delete("/sequences/:id", authMiddleware, adminAuth, deleteSequence);
+
+/* =====================================
+   GEOCODING ROUTES (Nominatim Proxy)
+===================================== */
+
+// Reverse geocoding - get address from coordinates
+router.get("/geocoding/reverse", reverseGeocode);
+
+// Forward geocoding - search by postalcode/address
+router.get("/geocoding/search", searchGeocode);
 
 export default router;

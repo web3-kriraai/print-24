@@ -3,7 +3,7 @@ import { AlertTriangle, Home, RefreshCw } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 
 interface Props {
-  children: ReactNode;
+  children?: ReactNode;
   fallback?: ReactNode;
 }
 
@@ -53,7 +53,7 @@ class ErrorBoundaryClass extends Component<Props, State> {
       return <ErrorFallbackWrapper error={this.state.error} errorInfo={this.state.errorInfo} />;
     }
 
-    return this.props.children;
+    return this.props.children || null;
   }
 }
 

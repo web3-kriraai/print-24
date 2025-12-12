@@ -11,13 +11,13 @@ import Policy from './pages/Policy';
 import Contact from './pages/Contact';
 import Login from './pages/Login';
 import SignUp from './pages/SignUp';
-import AdminDashboard from './pages/AdminDashboard';
 import Reviews from './pages/Reviews';
 import Profile from './pages/Profile';
 import OrderDetails from './pages/OrderDetails';
 import MyOrders from './pages/MyOrders';
 import DepartmentPortal from './pages/DepartmentPortal';
 import EmployeeDashboard from './pages/EmployeeDashboard';
+import AdminDashboard from './pages/AdminDashboard';
 
 // Shared routes configuration for both SSR and client
 export const routes = [
@@ -53,4 +53,3 @@ export const routes = [
     ],
   },
 ];
-

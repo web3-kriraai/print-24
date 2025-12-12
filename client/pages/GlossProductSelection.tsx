@@ -1168,16 +1168,16 @@ const GlossProductSelection: React.FC = () => {
     };
   };
 
-  // Helper function to get pincode coordinates (simplified - in production use a geocoding API)
+  // Helper function to get pincode coordinates (using backend proxy to avoid CORS)
   const getPincodeCoordinates = async (pincode: string): Promise<{ lat: number; lon: number; address: string } | null> => {
     try {
-      // Use a geocoding service to get coordinates from pincode
-      // For now, using a simplified approach - in production, use a proper geocoding API
+      // Use backend proxy to avoid CORS issues
+      const BASE_URL = API_BASE_URL;
       const response = await fetch(
-        `https://nominatim.openstreetmap.org/search?format=json&postalcode=${pincode}&country=India&limit=1`,
+        `${BASE_URL}/geocoding/search?postalcode=${pincode}&country=India&limit=1`,
         {
           headers: {
-            'User-Agent': 'Print24-Delivery-Estimate'
+            'Accept': 'application/json'
           }
         }
       );
@@ -1211,14 +1211,15 @@ const GlossProductSelection: React.FC = () => {
             async (position) => {
               const { latitude, longitude } = position.coords;
 
-              // Try to reverse geocode to get address
+              // Try to reverse geocode to get address (using backend proxy to avoid CORS)
               let locationAddress = '';
               try {
+                const BASE_URL = API_BASE_URL;
                 const response = await fetch(
-                  `https://nominatim.openstreetmap.org/reverse?format=json&lat=${latitude}&lon=${longitude}&addressdetails=1`,
+                  `${BASE_URL}/geocoding/reverse?lat=${latitude}&lon=${longitude}&addressdetails=1`,
                   {
                     headers: {
-                      'User-Agent': 'Print24-Delivery-Estimate'
+                      'Accept': 'application/json'
                     }
                   }
                 );
@@ -1344,13 +1345,14 @@ const GlossProductSelection: React.FC = () => {
 
       const { latitude, longitude } = position.coords;
 
-      // Use reverse geocoding API to get address
+      // Use reverse geocoding API to get address (using backend proxy to avoid CORS)
       try {
+        const BASE_URL = API_BASE_URL;
         const response = await fetch(
-          `https://nominatim.openstreetmap.org/reverse?format=json&lat=${latitude}&lon=${longitude}&zoom=18&addressdetails=1`,
+          `${BASE_URL}/geocoding/reverse?lat=${latitude}&lon=${longitude}&zoom=18&addressdetails=1`,
           {
             headers: {
-              'User-Agent': 'Print24-Order-System'
+              'Accept': 'application/json'
             }
           }
         );

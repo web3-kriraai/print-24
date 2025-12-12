@@ -34,7 +34,12 @@ const app = express();
 // Trust proxy for reverse proxy setups
 app.set("trust proxy", true);
 
-// CORS - Allow all origins for development
+// CORS - Configure allowed origins
+// Normalize FRONTEND_URL (remove trailing slash if present)
+const frontendUrl = process.env.FRONTEND_URL 
+  ? process.env.FRONTEND_URL.replace(/\/$/, '') 
+  : null;
+
 app.use(
   cors({
     origin: function (origin, callback) {
@@ -52,10 +57,18 @@ app.use(
         "http://127.0.0.1:5173"
       ];
 
+      // Add FRONTEND_URL from .env if it exists
+      if (frontendUrl) {
+        allowedOrigins.push(frontendUrl);
+      }
+
       // Allow if origin is in the list or if it's a localhost/127.0.0.1 origin
       if (allowedOrigins.includes(origin) ||
         origin.startsWith("http://localhost:") ||
         origin.startsWith("http://127.0.0.1:")) {
+        callback(null, true);
+      } else if (origin && (origin.includes("ngrok") || (frontendUrl && origin.startsWith(frontendUrl)))) {
+        // Allow ngrok origins or origins matching FRONTEND_URL
         callback(null, true);
       } else {
         // For development, allow all origins

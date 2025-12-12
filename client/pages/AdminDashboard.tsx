@@ -572,6 +572,8 @@ const AdminDashboard: React.FC = () => {
   const [productSearchQuery, setProductSearchQuery] = useState<string>("");
   const [subcategoryProducts, setSubcategoryProducts] = useState<Product[]>([]);
   const [loadingSubcategoryProducts, setLoadingSubcategoryProducts] = useState(false);
+  const [loadingProducts, setLoadingProducts] = useState(false);
+  const [filteringProducts, setFilteringProducts] = useState(false);
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
   const [selectedSubCategoryForView, setSelectedSubCategoryForView] = useState<string | null>(null);
   const [categorySubcategories, setCategorySubcategories] = useState<any[]>([]);
@@ -1179,6 +1181,7 @@ const AdminDashboard: React.FC = () => {
 
   const fetchProducts = async (categoryId?: string) => {
     try {
+      setLoadingProducts(true);
       let url = `${API_BASE_URL}/products`;
       
       // If categoryId is provided, fetch products for that category/subcategory
@@ -1203,20 +1206,35 @@ const AdminDashboard: React.FC = () => {
     } catch (err) {
       console.error("Error fetching products:", err);
       setError(err instanceof Error ? err.message : "Failed to fetch products");
+    } finally {
+      setLoadingProducts(false);
     }
   };
 
   // Filter products by search query and category/subcategory
   useEffect(() => {
+    // Show filtering loader if there's an active filter or search query
+    const hasActiveFilter = selectedSubCategoryFilter || productSearchQuery.trim();
+    if (hasActiveFilter && products.length > 0) {
+      setFilteringProducts(true);
+      // Small delay to show loader for better UX
+      const timer = setTimeout(() => {
+        setFilteringProducts(false);
+      }, 100);
+      return () => clearTimeout(timer);
+    } else {
+      setFilteringProducts(false);
+    }
+
     let filtered = products;
 
     // Filter by category/subcategory - check both category and subcategory fields
     if (selectedSubCategoryFilter) {
       filtered = filtered.filter((product) => {
-        const productCategoryId = typeof product.category === 'object' 
+        const productCategoryId = product.category && typeof product.category === 'object' 
           ? product.category._id 
           : product.category;
-        const productSubcategoryId = typeof product.subcategory === 'object' 
+        const productSubcategoryId = product.subcategory && typeof product.subcategory === 'object' 
           ? product.subcategory._id 
           : product.subcategory;
         // Match if product's category or subcategory matches the selected filter
@@ -1231,10 +1249,10 @@ const AdminDashboard: React.FC = () => {
       filtered = filtered.filter((product) => {
         const nameMatch = product.name?.toLowerCase().includes(query);
         const descMatch = product.description?.toLowerCase().includes(query);
-        const categoryMatch = typeof product.category === 'object' 
+        const categoryMatch = product.category && typeof product.category === 'object' 
           ? product.category.name?.toLowerCase().includes(query)
           : false;
-        const subcategoryMatch = typeof product.subcategory === 'object' 
+        const subcategoryMatch = product.subcategory && typeof product.subcategory === 'object' 
           ? product.subcategory.name?.toLowerCase().includes(query)
           : false;
         return nameMatch || descMatch || categoryMatch || subcategoryMatch;
@@ -1242,6 +1260,7 @@ const AdminDashboard: React.FC = () => {
     }
 
     setFilteredProducts(filtered);
+    setFilteringProducts(false);
   }, [products, selectedSubCategoryFilter, productSearchQuery]);
 
   const handleSubCategoryFilterChange = async (categoryId: string) => {
@@ -9266,9 +9285,11 @@ const AdminDashboard: React.FC = () => {
                     </div>
                     {(selectedSubCategoryFilter || productSearchQuery) && (
                       <button
-                        onClick={() => {
+                        onClick={async () => {
                           setSelectedSubCategoryFilter("");
                           setProductSearchQuery("");
+                          // Fetch all products after clearing filters
+                          await fetchProducts();
                         }}
                         className="px-4 py-2 bg-cream-200 text-cream-900 rounded-lg hover:bg-cream-300 transition-colors flex items-center gap-2 whitespace-nowrap"
                       >
@@ -9279,10 +9300,11 @@ const AdminDashboard: React.FC = () => {
                   </div>
                 </div>
                 <button
-                  onClick={() => {
+                  onClick={async () => {
                     setSelectedSubCategoryFilter("");
                     setProductSearchQuery("");
-                    fetchProducts();
+                    // Fetch all products after clearing filters
+                    await fetchProducts();
                   }}
                   className="px-4 py-2 bg-cream-200 text-cream-900 rounded-lg hover:bg-cream-300 transition-colors whitespace-nowrap flex items-center gap-2"
                 >
@@ -9291,12 +9313,19 @@ const AdminDashboard: React.FC = () => {
                 </button>
               </div>
 
-              {filteredProducts.length === 0 ? (
+              {(loadingProducts || filteringProducts) ? (
+                <div className="flex flex-col items-center justify-center py-12">
+                  <Loader className="animate-spin text-cream-600 mb-4" size={32} />
+                  <p className="text-cream-600">
+                    {loadingProducts ? "Loading products..." : "Filtering products..."}
+                  </p>
+                </div>
+              ) : filteredProducts.length === 0 ? (
                 <div className="text-center py-12 text-cream-600">
                   <Package size={48} className="mx-auto mb-4 opacity-50" />
                   <p>
-                    {selectedSubCategoryFilter
-                      ? "No products found for this subcategory"
+                    {selectedSubCategoryFilter || productSearchQuery
+                      ? "No products found matching your filters"
                       : "No products yet"}
                   </p>
                 </div>
@@ -9310,7 +9339,7 @@ const AdminDashboard: React.FC = () => {
                     
                     // Check if product has a subcategory
                     if (product.subcategory) {
-                      const subcategoryId = typeof product.subcategory === "object" 
+                      const subcategoryId = product.subcategory && typeof product.subcategory === "object" 
                         ? product.subcategory._id 
                         : product.subcategory;
                       
@@ -9353,7 +9382,7 @@ const AdminDashboard: React.FC = () => {
                       }
                     } else if (product.category) {
                       // Product has direct category (no subcategory)
-                      const categoryId = typeof product.category === "object" 
+                      const categoryId = product.category && typeof product.category === "object" 
                         ? product.category._id 
                         : (typeof product.category === 'string' ? product.category : '');
                       
