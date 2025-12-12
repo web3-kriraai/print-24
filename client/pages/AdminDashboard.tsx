@@ -80,6 +80,7 @@ interface User {
   email: string;
   role: string;
   createdAt: string;
+  isEmployee?: boolean;
 }
 
 interface Upload {
@@ -119,12 +120,20 @@ interface Order {
     name: string;
     image: string;
     basePrice?: number;
-    subcategory?: { name: string } | string;
+    category?: string | { _id: string; name: string };
+    subcategory?: { name: string; category?: string | { _id: string; name: string } } | string;
     options?: Array<{ name: string; priceAdd: number; description?: string; image?: string }>;
     discount?: number;
     description?: string;
     instructions?: string;
     attributes?: Array<{ name: string; value: string }>;
+    filters?: {
+      printingOption?: any[];
+      orderQuantity?: any;
+      deliverySpeed?: any[];
+      textureType?: any[];
+    };
+    gstPercentage?: number;
     minFileWidth?: number;
     maxFileWidth?: number;
     minFileHeight?: number;
@@ -137,6 +146,17 @@ interface Order {
     optionId: string;
     optionName: string;
     priceAdd: number;
+    name?: string;
+  }>;
+  selectedDynamicAttributes?: Array<{
+    attributeType: string;
+    value: string;
+    label?: string;
+    attributeName?: string;
+    image?: string;
+    description?: string;
+    priceAdd?: number;
+    priceMultiplier?: number;
   }>;
   totalPrice: number;
   status: "request" | "production_ready" | "approved" | "processing" | "completed" | "cancelled" | "rejected";
@@ -145,6 +165,25 @@ interface Order {
   address: string;
   mobileNumber: string;
   createdAt: string;
+  advancePaid?: number;
+  departmentStatuses?: Array<{
+    department: string | { _id: string; name: string; sequence?: number };
+    status: string;
+    completedAt?: string;
+    startedAt?: string;
+    whenAssigned?: string;
+    pausedAt?: string;
+    stoppedAt?: string;
+    operator?: string | { _id: string; name: string };
+    notes?: string;
+  }>;
+  productionTimeline?: {
+    estimatedDays?: number;
+    startDate?: string;
+    endDate?: string;
+    length?: number;
+    sort?: number;
+  };
   currentDepartment?: {
     _id: string;
     name: string;
@@ -279,7 +318,7 @@ const HierarchicalCategorySelector: React.FC<{
                   value={selectedCategoryPath[level] || ""}
                   onChange={(value) => {
                     if (value) {
-                      handleCategorySelect(value, level);
+                      handleCategorySelect(String(value), level);
                     } else {
                       setSelectedCategoryPath([]);
                       onCategorySelect("");
@@ -316,7 +355,7 @@ const HierarchicalCategorySelector: React.FC<{
                     value={selectedCategoryPath[level] || ""}
                     onChange={(value) => {
                       if (value) {
-                        handleCategorySelect(value, level);
+                        handleCategorySelect(String(value), level);
                       } else {
                         setSelectedCategoryPath(selectedCategoryPath.slice(0, level));
                         onCategorySelect(selectedCategoryPath[level - 1] || "");
@@ -325,7 +364,7 @@ const HierarchicalCategorySelector: React.FC<{
                     options={[
                       { value: "", label: `Select Subcategory${level > 1 ? ` (Level ${level})` : ''}` },
                       ...children
-                        .sort((a, b) => (a.sortOrder || 0) - (b.sortOrder || 0))
+                        .sort((a, b) => ((a as Category).sortOrder || 0) - ((b as Category).sortOrder || 0))
                         .map((cat) => ({
                           value: cat._id,
                           label: cat.name,
@@ -1649,7 +1688,7 @@ const AdminDashboard: React.FC = () => {
     }
 
     const containerRect = container.getBoundingClientRect();
-    const mouseY = 'clientY' in e ? e.clientY : e.clientY;
+    const mouseY = (e as MouseEvent).clientY;
     const scrollThreshold = 80; // Distance from edge to trigger scroll
     const maxScrollSpeed = 20; // Maximum pixels to scroll per frame
     const minScrollSpeed = 5; // Minimum pixels to scroll per frame
@@ -2785,8 +2824,14 @@ const AdminDashboard: React.FC = () => {
         errors.inputStyle = "Input style is required";
         hasErrors = true;
       }
-      if (!fullAttributeType.primaryEffectType) {
-        errors.primaryEffectType = "Primary effect type is required";
+      if (!fullAttributeType.primaryEffectType || fullAttributeType.primaryEffectType.trim() === "") {
+        errors.primaryEffectType = "Primary effect type is required. Please describe what this attribute affects in the 'What This Affects' field.";
+        hasErrors = true;
+      }
+      
+      // Validate effectDescription is provided (used to determine primaryEffectType)
+      if (!attributeTypeForm.effectDescription || attributeTypeForm.effectDescription.trim() === "") {
+        errors.primaryEffectType = "Please describe what this attribute affects in the 'What This Affects' field.";
         hasErrors = true;
       }
 
@@ -3915,7 +3960,14 @@ const AdminDashboard: React.FC = () => {
         options: "",
         filters: {
           printingOption: [],
-          orderQuantity: { min: 1000, max: 72000, multiples: 1000 },
+          orderQuantity: { 
+          min: 1000, 
+          max: 72000, 
+          multiples: 1000,
+          quantityType: "SIMPLE" as "SIMPLE" | "STEP_WISE" | "RANGE_WISE",
+          stepWiseQuantities: [],
+          rangeWiseQuantities: []
+        },
           deliverySpeed: [],
           textureType: [],
         },
@@ -3951,7 +4003,7 @@ const AdminDashboard: React.FC = () => {
       
       // If viewing a category, refresh its products
       if (selectedCategory) {
-        handleCategoryClick(selectedCategory);
+        handleCategoryClick(typeof selectedCategory === 'string' ? selectedCategory : selectedCategory._id);
       }
       
       // If viewing a subcategory, refresh its products
@@ -4319,17 +4371,29 @@ const AdminDashboard: React.FC = () => {
       options: "",
       filters: {
         printingOption: [],
-        orderQuantity: { min: 1000, max: 72000, multiples: 1000 },
-        deliverySpeed: [],
-        textureType: [],
+        orderQuantity: { 
+          min: 1000, 
+          max: 72000, 
+          multiples: 1000,
+          quantityType: "SIMPLE" as "SIMPLE" | "STEP_WISE" | "RANGE_WISE",
+          stepWiseQuantities: [],
+          rangeWiseQuantities: []
+        },
+        deliverySpeed: [] as string[],
+        textureType: [] as string[],
       },
       maxFileSizeMB: "",
-      fileHeight: "",
-      fileWidth: "",
       blockCDRandJPG: false,
       additionalDesignCharge: "",
       gstPercentage: "",
       instructions: "",
+      quantityDiscounts: [],
+      minFileWidth: "",
+      maxFileWidth: "",
+      minFileHeight: "",
+      maxFileHeight: "",
+      productionSequence: [] as string[],
+      showPriceIncludingGst: false,
     });
     setOptionsTable([]);
     setPrintingOptionsTable([]);
@@ -4350,6 +4414,7 @@ const AdminDashboard: React.FC = () => {
       name: "",
       description: "",
       category: "",
+      type: "",
       slug: "",
       sortOrder: 0,
       image: null,
@@ -5972,15 +6037,15 @@ const AdminDashboard: React.FC = () => {
                       <ReviewFilterDropdown
                         id="product-category"
                         label="Select Category"
-                        value={productForm.category || selectedCategoryPath[0] || ""}
+                        value={String(productForm.category || selectedCategoryPath[0] || "")}
                         onChange={async (value) => {
                           if (value) {
                             // Set the first level of the path
-                            setSelectedCategoryPath([value]);
+                            setSelectedCategoryPath([String(value)]);
                             // Update product form with the selected category
                             setProductForm({
                               ...productForm,
-                              category: value,
+                              category: String(value),
                               subcategory: "", // Reset subcategory when category changes
                             });
                             
@@ -5990,7 +6055,7 @@ const AdminDashboard: React.FC = () => {
                             }
                             
                             // Immediately fetch children for this category
-                            await fetchCategoryChildren(value);
+                            await fetchCategoryChildren(String(value));
                             
                             // Clear products - will show subcategories instead
                             setCategoryProducts([]);
@@ -6035,9 +6100,9 @@ const AdminDashboard: React.FC = () => {
                 
                 {/* Subcategory Selection - Only Level 1 */}
                 {productForm.category && selectedCategoryPath.length > 0 && (() => {
-                  const children = categoryChildrenMap[selectedCategoryPath[0]] || [];
-                  const isLoading = loadingCategoryChildren[selectedCategoryPath[0]] || false;
-                  const selectedChildId = selectedCategoryPath[1] || "";
+                  const children = categoryChildrenMap[String(selectedCategoryPath[0] || "")] || [];
+                  const isLoading = loadingCategoryChildren[String(selectedCategoryPath[0] || "")] || false;
+                  const selectedChildId = String(selectedCategoryPath[1] || "");
 
                   return (
                     <div className="mt-4">
@@ -6052,17 +6117,17 @@ const AdminDashboard: React.FC = () => {
                       ) : children.length > 0 ? (
                         <ReviewFilterDropdown
                           label="Select Subcategory"
-                          value={selectedChildId || productForm.subcategory || ""}
+                          value={String(selectedChildId || productForm.subcategory || "")}
                           onChange={async (value) => {
                             if (value) {
                               // Update path to include subcategory
-                              setSelectedCategoryPath([selectedCategoryPath[0], value]);
+                              setSelectedCategoryPath([String(selectedCategoryPath[0]), String(value)]);
                               
                               // Update product form
                               setProductForm({
                                 ...productForm,
-                                category: selectedCategoryPath[0],
-                                subcategory: value,
+                                category: String(selectedCategoryPath[0]),
+                                subcategory: String(value),
                               });
                               
                               // Fetch products for the selected subcategory
@@ -9015,7 +9080,7 @@ const AdminDashboard: React.FC = () => {
                   Uploaded Images ({uploads.length})
                 </h2>
                 <button
-                  onClick={fetchUploads}
+                  onClick={() => fetchUploads(false)}
                   disabled={loadingUploads}
                   className="px-4 py-2 bg-cream-200 text-cream-900 rounded-lg hover:bg-cream-300 transition-colors disabled:opacity-50 flex items-center gap-2"
                 >
@@ -9261,7 +9326,10 @@ const AdminDashboard: React.FC = () => {
                           : productSubcategory.category;
                         
                         if (parentCategoryId) {
-                          const parentCategory = categories.find((c: Category) => c._id === parentCategoryId);
+                          const parentCategory = categories.find((c: Category) => {
+                            const catId = typeof parentCategoryId === 'string' ? parentCategoryId : (typeof parentCategoryId === 'object' && parentCategoryId?._id ? parentCategoryId._id : '');
+                            return c._id === catId;
+                          });
                           if (parentCategory) {
                             categoryName = parentCategory.name || "No Category";
                             categoryType = parentCategory.type || "";
@@ -9270,13 +9338,16 @@ const AdminDashboard: React.FC = () => {
                       } else if (typeof product.subcategory === "object" && product.subcategory.name) {
                         // If subcategory is populated in the product object
                         subcategoryName = product.subcategory.name;
-                        if (product.subcategory.category) {
-                          const parentCategory = typeof product.subcategory.category === "object"
-                            ? product.subcategory.category
-                            : categories.find((c: Category) => c._id === product.subcategory.category);
-                          if (parentCategory) {
-                            categoryName = typeof parentCategory === "object" ? parentCategory.name : "No Category";
-                            categoryType = typeof parentCategory === "object" ? parentCategory.type : "";
+                        if (typeof product.subcategory === "object" && product.subcategory.category) {
+                          const categoryRef = product.subcategory.category;
+                          const parentCategory = typeof categoryRef === "object" && '_id' in categoryRef
+                            ? categoryRef
+                            : (typeof categoryRef === 'string' 
+                                ? categories.find((c: Category) => c._id === categoryRef)
+                                : null);
+                          if (parentCategory && typeof parentCategory === "object" && '_id' in parentCategory) {
+                            categoryName = parentCategory.name || "No Category";
+                            categoryType = ('type' in parentCategory && typeof parentCategory.type === 'string' ? parentCategory.type : "") || "";
                           }
                         }
                       }
@@ -9284,16 +9355,16 @@ const AdminDashboard: React.FC = () => {
                       // Product has direct category (no subcategory)
                       const categoryId = typeof product.category === "object" 
                         ? product.category._id 
-                        : product.category;
+                        : (typeof product.category === 'string' ? product.category : '');
                       
-                      const productCategory = categories.find((c: Category) => c._id === categoryId);
+                      const productCategory = categories.find((c: Category) => c._id === String(categoryId));
                       if (productCategory) {
                         categoryName = productCategory.name || "No Category";
                         categoryType = productCategory.type || "";
-                      } else if (typeof product.category === "object" && product.category.name) {
+                      } else if (typeof product.category === "object" && '_id' in product.category && 'name' in product.category) {
                         // If category is populated in the product object
-                        categoryName = product.category.name;
-                        categoryType = product.category.type || "";
+                        categoryName = product.category.name || "No Category";
+                        categoryType = ('type' in product.category && typeof product.category.type === 'string' ? product.category.type : "") || "";
                       }
                     }
                     
@@ -10059,6 +10130,18 @@ const AdminDashboard: React.FC = () => {
                   {editingAttributeTypeId ? "Edit Attribute Type" : "Create Attribute Type"}
                 </h2>
                 <form onSubmit={handleAttributeTypeSubmit} className="space-y-6 bg-white p-6 rounded-lg border border-cream-200">
+                  {/* Error Display */}
+                  {error && (
+                    <div className="p-4 bg-red-50 border border-red-200 rounded-lg">
+                      <p className="text-sm text-red-800 font-medium">{error}</p>
+                    </div>
+                  )}
+                  {/* Success Display */}
+                  {success && (
+                    <div className="p-4 bg-green-50 border border-green-200 rounded-lg">
+                      <p className="text-sm text-green-800 font-medium">{success}</p>
+                    </div>
+                  )}
                   {/* Step 1: Basic Information */}
                   <div className="border-b border-cream-200 pb-4">
                     <h3 className="text-lg font-semibold text-cream-900 mb-4">Basic Information</h3>
@@ -10069,21 +10152,40 @@ const AdminDashboard: React.FC = () => {
                         </label>
                         <input
                           type="text"
+                          id="attribute-name"
                           value={attributeTypeForm.attributeName}
-                          onChange={(e) => setAttributeTypeForm({ ...attributeTypeForm, attributeName: e.target.value })}
-                          className="w-full px-3 py-2 border border-cream-300 rounded-lg focus:ring-2 focus:ring-cream-900 focus:border-transparent"
+                          onChange={(e) => {
+                            setAttributeTypeForm({ ...attributeTypeForm, attributeName: e.target.value });
+                            if (attributeFormErrors.attributeName) {
+                              setAttributeFormErrors({ ...attributeFormErrors, attributeName: undefined });
+                            }
+                          }}
+                          className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-cream-900 focus:border-transparent ${
+                            attributeFormErrors.attributeName ? 'border-red-300 bg-red-50' : 'border-cream-300'
+                          }`}
                           placeholder="e.g., Printing Option, Paper Type"
                           required
                         />
+                        {attributeFormErrors.attributeName && (
+                          <p className="mt-1 text-sm text-red-600">{attributeFormErrors.attributeName}</p>
+                        )}
                       </div>
                       <div>
                         <label className="block text-sm font-medium text-cream-900 mb-2">
                           How Customers Select This * <span className="text-xs text-cream-500 font-normal">(Input method)</span>
                         </label>
                         <select
+                          id="attribute-inputStyle"
                           value={attributeTypeForm.inputStyle}
-                          onChange={(e) => setAttributeTypeForm({ ...attributeTypeForm, inputStyle: e.target.value })}
-                          className="w-full px-3 py-2 border border-cream-300 rounded-lg focus:ring-2 focus:ring-cream-900 focus:border-transparent"
+                          onChange={(e) => {
+                            setAttributeTypeForm({ ...attributeTypeForm, inputStyle: e.target.value });
+                            if (attributeFormErrors.inputStyle) {
+                              setAttributeFormErrors({ ...attributeFormErrors, inputStyle: undefined });
+                            }
+                          }}
+                          className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-cream-900 focus:border-transparent ${
+                            attributeFormErrors.inputStyle ? 'border-red-300 bg-red-50' : 'border-cream-300'
+                          }`}
                           required
                         >
                           <option value="DROPDOWN">Dropdown Menu</option>
@@ -10094,6 +10196,9 @@ const AdminDashboard: React.FC = () => {
                           <option value="NUMBER">Number Input</option>
                           <option value="FILE_UPLOAD">File Upload</option>
                         </select>
+                        {attributeFormErrors.inputStyle && (
+                          <p className="mt-1 text-sm text-red-600">{attributeFormErrors.inputStyle}</p>
+                        )}
                       </div>
                       <div>
                         <label className="block text-sm font-medium text-cream-900 mb-2">
@@ -10146,20 +10251,31 @@ const AdminDashboard: React.FC = () => {
                         What This Affects * <span className="text-xs text-cream-500 font-normal">(Description of impact on product)</span>
                       </label>
                       <textarea
+                        id="attribute-primaryEffectType"
                         value={attributeTypeForm.effectDescription}
-                        onChange={(e) => setAttributeTypeForm({ ...attributeTypeForm, effectDescription: e.target.value })}
-                        className="w-full px-3 py-2 border border-cream-300 rounded-lg focus:ring-2 focus:ring-cream-900 focus:border-transparent"
+                        onChange={(e) => {
+                          setAttributeTypeForm({ ...attributeTypeForm, effectDescription: e.target.value });
+                          if (attributeFormErrors.primaryEffectType) {
+                            setAttributeFormErrors({ ...attributeFormErrors, primaryEffectType: undefined });
+                          }
+                        }}
+                        className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-cream-900 focus:border-transparent ${
+                          attributeFormErrors.primaryEffectType ? 'border-red-300 bg-red-50' : 'border-cream-300'
+                        }`}
                         rows={3}
                         placeholder="e.g., Changes the product price, Requires customer to upload a file, Creates different product versions, Just displays information"
                         required
                       />
                       <p className="mt-1 text-xs text-cream-600">Describe how this attribute affects the product or customer experience</p>
+                      {attributeFormErrors.primaryEffectType && (
+                        <p className="mt-1 text-sm text-red-600">{attributeFormErrors.primaryEffectType}</p>
+                      )}
                     </div>
                   </div>
 
                   {/* Options Table - Show when DROPDOWN/RADIO or when Is Price Effect is checked */}
                   {((attributeTypeForm.inputStyle === "DROPDOWN" || attributeTypeForm.inputStyle === "RADIO") || attributeTypeForm.isPriceEffect) ? (
-                    <div className="border-b border-cream-200 pb-4">
+                    <div className="border-b border-cream-200 pb-4" data-attribute-options-table>
                       <div className="flex items-center justify-between mb-4">
                         <h3 className="text-lg font-semibold text-cream-900">Options</h3>
                         <button
@@ -10183,6 +10299,11 @@ const AdminDashboard: React.FC = () => {
                           </p>
                         ) : (
                           <div className="overflow-x-auto">
+                            {attributeFormErrors.attributeValues && (
+                              <div className="mb-2 p-3 bg-red-50 border border-red-200 rounded-lg">
+                                <p className="text-sm text-red-800 font-medium">{attributeFormErrors.attributeValues}</p>
+                              </div>
+                            )}
                             <table className="w-full border-collapse">
                               <thead>
                                 <tr className="bg-cream-100">
@@ -10667,30 +10788,35 @@ const AdminDashboard: React.FC = () => {
       setAttributeTypeForm({
         attributeName: "",
         inputStyle: "DROPDOWN",
+        attributeImage: null,
         effectDescription: "",
         simpleOptions: "",
         isPriceEffect: false,
+        isStepQuantity: false,
+        isRangeQuantity: false,
         isFixedQuantity: false,
         priceEffectAmount: "",
+        stepQuantities: [],
+        rangeQuantities: [],
         fixedQuantityMin: "",
         fixedQuantityMax: "",
         primaryEffectType: "INFORMATIONAL",
         priceImpactPer1000: "",
         fileRequirements: "",
-        attributeOptions: [],
-                            // Reset auto-set fields
-                            functionType: "GENERAL",
-                            isPricingAttribute: false,
-                            isFixedQuantityNeeded: false,
-                            isFilterable: false,
-                            attributeValues: [],
-                            defaultValue: "",
-                            isRequired: false,
-                            displayOrder: 0,
-                            isCommonAttribute: true,
-                            applicableCategories: [],
-                            applicableSubCategories: [],
-                          });
+        attributeOptionsTable: [],
+        // Reset auto-set fields
+        functionType: "GENERAL",
+        isPricingAttribute: false,
+        isFixedQuantityNeeded: false,
+        isFilterable: false,
+        attributeValues: [],
+        defaultValue: "",
+        isRequired: false,
+        displayOrder: 0,
+        isCommonAttribute: true,
+        applicableCategories: [],
+        applicableSubCategories: [],
+      });
                         }}
                         className="px-6 py-2 bg-gray-500 text-white rounded-lg hover:bg-gray-600"
                       >
@@ -11058,6 +11184,7 @@ const AdminDashboard: React.FC = () => {
                           category: "",
                           subcategory: "",
                           selectedDepartments: [],
+                          selectedAttributes: [],
                         });
                       }}
                       className="px-3 py-1 text-sm bg-blue-100 text-blue-800 rounded-lg hover:bg-blue-200 transition-colors"
@@ -11107,7 +11234,7 @@ const AdminDashboard: React.FC = () => {
                       onChange={(value) => {
                         setSequenceForm({
                           ...sequenceForm,
-                          printType: value,
+                          printType: String(value),
                           category: "", // Reset category when print type changes
                           subcategory: "", // Reset subcategory when print type changes
                         });
@@ -11140,11 +11267,11 @@ const AdminDashboard: React.FC = () => {
                           <ReviewFilterDropdown
                             id="sequence-category"
                             label="Select Category"
-                            value={sequenceForm.category}
+                            value={String(sequenceForm.category || "")}
                             onChange={(value) => {
                               setSequenceForm({
                                 ...sequenceForm,
-                                category: value,
+                                category: String(value),
                                 subcategory: "", // Reset subcategory when category changes
                               });
                             }}
@@ -11180,7 +11307,7 @@ const AdminDashboard: React.FC = () => {
                             label="Select Subcategory"
                             value={sequenceForm.subcategory}
                             onChange={(value) =>
-                              setSequenceForm({ ...sequenceForm, subcategory: value })
+                              setSequenceForm({ ...sequenceForm, subcategory: String(value) })
                             }
                             options={[
                               { value: "", label: "Select Subcategory (Optional)" },
@@ -11190,16 +11317,15 @@ const AdminDashboard: React.FC = () => {
                                   const categoryId = subCat.category 
                                     ? (typeof subCat.category === 'object' ? subCat.category._id : subCat.category)
                                     : null;
-                                  return categoryId === sequenceForm.category;
+                                  return String(categoryId) === String(sequenceForm.category);
                                 })
-                                .sort((a, b) => (a.sortOrder || 0) - (b.sortOrder || 0))
+                                .sort((a, b) => ((a as Category).sortOrder || 0) - ((b as Category).sortOrder || 0))
                                 .map((subCat) => ({
                                   value: subCat._id,
                                   label: subCat.name,
                                 })),
                             ]}
                             className="w-full"
-                            disabled={!sequenceForm.category}
                           />
                         </div>
                       </div>
@@ -11724,9 +11850,9 @@ const AdminDashboard: React.FC = () => {
                     <div className="flex-1">
                       <p className="font-bold text-cream-900 text-lg mb-1">{selectedOrder.product.name}</p>
                       <p className="text-sm text-cream-600 mb-2">
-                        Category: {selectedOrder.product.category && typeof selectedOrder.product.category === "object" 
-                          ? selectedOrder.product.category.name 
-                          : selectedOrder.product.category || "N/A"}
+                        Category: {selectedOrder.product.category && typeof selectedOrder.product.category === "object" && '_id' in selectedOrder.product.category
+                          ? (selectedOrder.product.category.name || "N/A")
+                          : (typeof selectedOrder.product.category === 'string' ? selectedOrder.product.category : "N/A")}
                       </p>
                       <p className="text-sm text-cream-600">
                         Base Price: ₹{selectedOrder.product.basePrice?.toFixed(2) || "0.00"} per unit
@@ -12160,7 +12286,9 @@ const AdminDashboard: React.FC = () => {
                                     <div className="flex items-center gap-2 text-xs mt-1">
                                       <Users size={12} className="text-cream-600" />
                                       <span className="text-cream-600">
-                                        Operator: {deptStatus.operator.name} ({deptStatus.operator.email})
+                                        Operator: {typeof deptStatus.operator === "object" && deptStatus.operator && '_id' in deptStatus.operator
+                                          ? `${deptStatus.operator.name || 'N/A'} (${('email' in deptStatus.operator && typeof deptStatus.operator.email === 'string' ? deptStatus.operator.email : 'N/A')})`
+                                          : 'N/A'}
                                       </span>
                                     </div>
                                   )}
@@ -12186,9 +12314,9 @@ const AdminDashboard: React.FC = () => {
                       Production Activity Timeline
                     </h3>
                     <div className="space-y-2 max-h-96 overflow-y-auto">
-                      {selectedOrder.productionTimeline
-                        .sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime())
-                        .map((timelineItem, idx) => {
+                      {Array.isArray(selectedOrder.productionTimeline) && selectedOrder.productionTimeline
+                        .sort((a: any, b: any) => new Date(b.timestamp || 0).getTime() - new Date(a.timestamp || 0).getTime())
+                        .map((timelineItem: any, idx: number) => {
                           const deptName = typeof timelineItem.department === "object" 
                             ? timelineItem.department.name 
                             : "Department";

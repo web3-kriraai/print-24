@@ -28,6 +28,8 @@ export default defineConfig({
     // Bundle React/ReactDOM in SSR to avoid resolution issues
     // This ensures React is available when the SSR module is imported
     noExternal: ['react', 'react-dom', 'react-router-dom', 'react-router', 'framer-motion', 'lucide-react'],
+    // Exclude PrimeReact from SSR to avoid ESM import issues
+    external: ['primereact', 'primereact/editor', 'quill'],
   },
   server: {
     port: 3000,

@@ -2322,22 +2322,45 @@ const GlossProductSelection: React.FC = () => {
             onClick={() => {
               // Navigate back based on current route structure
               if (productId && subCategoryId && categoryId) {
-                // From product detail → go back to subcategory products
+                // From product detail with subcategory → go back to subcategory products list
                 navigate(`/digital-print/${categoryId}/${subCategoryId}`);
               } else if (productId && categoryId) {
                 // From product detail (direct under category) → go back to category
                 navigate(`/digital-print/${categoryId}`);
               } else if (subCategoryId && categoryId) {
-                // From subcategory products → go back to category
+                // From subcategory products list → go back to category
                 navigate(`/digital-print/${categoryId}`);
+              } else if (categoryId) {
+                // From category → go back to digital print home
+                navigate("/digital-print");
               } else {
                 // Fallback to digital print page
                 navigate("/digital-print");
               }
               window.scrollTo(0, 0);
             }}
-            fallbackPath={categoryId ? `/digital-print/${categoryId}` : "/digital-print"}
-            label={subCategoryId ? "Back to Subcategory" : categoryId ? "Back to Category" : "Back to Categories"}
+            fallbackPath={
+              productId && subCategoryId && categoryId 
+                ? `/digital-print/${categoryId}/${subCategoryId}`
+                : productId && categoryId
+                ? `/digital-print/${categoryId}`
+                : subCategoryId && categoryId
+                ? `/digital-print/${categoryId}`
+                : categoryId
+                ? `/digital-print/${categoryId}`
+                : "/digital-print"
+            }
+            label={
+              productId && subCategoryId 
+                ? "Back to Subcategory"
+                : productId && categoryId
+                ? "Back to Category"
+                : subCategoryId
+                ? "Back to Category"
+                : categoryId
+                ? "Back to Categories"
+                : "Back to Categories"
+            }
             className="text-sm sm:text-base text-cream-600 hover:text-cream-900"
           />
         </div>
@@ -2586,20 +2609,46 @@ const GlossProductSelection: React.FC = () => {
                         <BackButton
                           onClick={() => {
                             // Navigate back based on current route structure
-                            if (subCategoryId && categoryId) {
-                              // From product detail → go back to subcategory products
+                            if (productId && subCategoryId && categoryId) {
+                              // From product detail with subcategory → go back to subcategory products list
                               navigate(`/digital-print/${categoryId}/${subCategoryId}`);
-                            } else if (categoryId) {
+                            } else if (productId && categoryId) {
                               // From product detail (direct under category) → go back to category
                               navigate(`/digital-print/${categoryId}`);
+                            } else if (subCategoryId && categoryId) {
+                              // From subcategory products list → go back to category
+                              navigate(`/digital-print/${categoryId}`);
+                            } else if (categoryId) {
+                              // From category → go back to digital print home
+                              navigate("/digital-print");
                             } else {
                               // Fallback to digital print page
                               navigate("/digital-print");
                             }
                             window.scrollTo(0, 0);
                           }}
-                          fallbackPath={subCategoryId && categoryId ? `/digital-print/${categoryId}/${subCategoryId}` : categoryId ? `/digital-print/${categoryId}` : "/digital-print"}
-                          label={subCategoryId ? "Back to Subcategory" : categoryId ? "Back to Category" : "Back to Products"}
+                          fallbackPath={
+                            productId && subCategoryId && categoryId 
+                              ? `/digital-print/${categoryId}/${subCategoryId}`
+                              : productId && categoryId
+                              ? `/digital-print/${categoryId}`
+                              : subCategoryId && categoryId
+                              ? `/digital-print/${categoryId}`
+                              : categoryId
+                              ? `/digital-print/${categoryId}`
+                              : "/digital-print"
+                          }
+                          label={
+                            productId && subCategoryId 
+                              ? "Back to Subcategory"
+                              : productId && categoryId
+                              ? "Back to Category"
+                              : subCategoryId
+                              ? "Back to Category"
+                              : categoryId
+                              ? "Back to Categories"
+                              : "Back to Categories"
+                          }
                           className="text-sm text-cream-600 hover:text-cream-900 mb-2"
                         />
                       </div>

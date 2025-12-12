@@ -35,6 +35,7 @@ const VisitingCards: React.FC = () => {
   const navigate = useNavigate();
   const [categoryName, setCategoryName] = useState('');
   const [categoryDescription, setCategoryDescription] = useState('');
+  const [categoryImage, setCategoryImage] = useState<string>('');
   const [subCategories, setSubCategories] = useState<SubCategory[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
   const [selectedSubCategory, setSelectedSubCategory] = useState<SubCategory | null>(null);
@@ -205,6 +206,7 @@ const VisitingCards: React.FC = () => {
                   const categoryData = await handleNgrokResponse(categoryResponse);
                   setCategoryName(categoryData.name || '');
                   setCategoryDescription(categoryData.description || '');
+                  setCategoryImage(categoryData.image || '/Glossy.png');
                 } catch (categoryErr) {
                   console.error("Error fetching category info:", categoryErr);
                   // Don't fail the whole operation if category info fetch fails
@@ -409,6 +411,7 @@ const VisitingCards: React.FC = () => {
                 const categoryData = await handleNgrokResponse(categoryResponse);
                 setCategoryName(categoryData.name || '');
                 setCategoryDescription(categoryData.description || '');
+                setCategoryImage(categoryData.image || '/Glossy.png');
               } catch (categoryErr) {
                 console.error("Error fetching category info:", categoryErr);
                 // Don't fail the whole operation if category info fetch fails
@@ -696,6 +699,7 @@ const VisitingCards: React.FC = () => {
                   const categoryData = await handleNgrokResponse(categoryResponse);
                   setCategoryName(categoryData.name || '');
                   setCategoryDescription(categoryData.description || '');
+                  setCategoryImage(categoryData.image || '/Glossy.png');
                   // If subcategory doesn't exist but we have products, create a mock subcategory for display
                   // This ensures products can be displayed even when subcategory is missing
                   if (Array.isArray(productsData) && productsData.length > 0) {
@@ -804,6 +808,7 @@ const VisitingCards: React.FC = () => {
               if (categoryInfo) {
                 setCategoryName(categoryInfo.name || '');
                 setCategoryDescription(categoryInfo.description || '');
+                setCategoryImage(categoryInfo.image || '/Glossy.png');
               }
             }
           } else {
@@ -887,71 +892,73 @@ const VisitingCards: React.FC = () => {
           </div>
         ) : (subCategories.length > 0 && !subCategoryId) || (products.length > 0 && subCategories.length === 0 && !subCategoryId) ? (
           <>
-            {/* Subcategory Filters */}
-            <div className="mb-6 bg-white rounded-xl shadow-md border border-cream-200 p-4 sm:p-6">
-              <div className="flex flex-col sm:flex-row items-start sm:items-end gap-4">
-                {/* Subcategory Search Bar */}
-                <div className="relative flex-1 sm:flex-initial sm:w-64">
-                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-cream-500 w-5 h-5" />
-                  <input
-                    type="text"
-                    placeholder="Search subcategories..."
-                    value={subCategorySearchQuery}
-                    onChange={(e) => setSubCategorySearchQuery(e.target.value)}
-                    className="w-full pl-10 pr-10 py-2.5 border-2 border-cream-300 rounded-lg focus:ring-2 focus:ring-cream-500 focus:border-cream-500 text-sm sm:text-base bg-white shadow-sm transition-all"
-                  />
-                  {subCategorySearchQuery && (
+            {/* Subcategory Filters - Only show when subcategories are available */}
+            {subCategories.length > 0 && (
+              <div className="mb-6 bg-white rounded-xl shadow-md border border-cream-200 p-4 sm:p-6">
+                <div className="flex flex-col sm:flex-row items-start sm:items-end gap-4">
+                  {/* Subcategory Search Bar */}
+                  <div className="relative flex-1 sm:flex-initial sm:w-64">
+                    <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-cream-500 w-5 h-5" />
+                    <input
+                      type="text"
+                      placeholder="Search subcategories..."
+                      value={subCategorySearchQuery}
+                      onChange={(e) => setSubCategorySearchQuery(e.target.value)}
+                      className="w-full pl-10 pr-10 py-2.5 border-2 border-cream-300 rounded-lg focus:ring-2 focus:ring-cream-500 focus:border-cream-500 text-sm sm:text-base bg-white shadow-sm transition-all"
+                    />
+                    {subCategorySearchQuery && (
+                      <button
+                        onClick={() => setSubCategorySearchQuery("")}
+                        className="absolute right-3 top-1/2 transform -translate-y-1/2 text-cream-500 hover:text-cream-700 transition-colors"
+                      >
+                        <X size={18} />
+                      </button>
+                    )}
+                  </div>
+
+                  {/* Subcategory Dropdown */}
+                  <div className="flex-1 sm:flex-initial sm:w-64">
+                    <label className="block text-sm font-semibold text-cream-900 mb-2">
+                      Filter Subcategory
+                    </label>
+                    <ReviewFilterDropdown
+                      label="All Subcategories"
+                      value={selectedSubCategoryFilter}
+                      onChange={(value) => setSelectedSubCategoryFilter(value as string | null)}
+                      options={[
+                        { value: null, label: "All Subcategories" },
+                        ...subCategories
+                          .filter(subCat => {
+                            if (subCategorySearchQuery && !subCat.name.toLowerCase().includes(subCategorySearchQuery.toLowerCase())) {
+                              return false;
+                            }
+                            return true;
+                          })
+                          .map(subCat => ({
+                            value: subCat._id,
+                            label: subCat.name
+                          })),
+                      ]}
+                      className="w-full"
+                    />
+                  </div>
+
+                  {/* Clear Filters Button */}
+                  {(subCategorySearchQuery || selectedSubCategoryFilter) && (
                     <button
-                      onClick={() => setSubCategorySearchQuery("")}
-                      className="absolute right-3 top-1/2 transform -translate-y-1/2 text-cream-500 hover:text-cream-700 transition-colors"
+                      onClick={() => {
+                        setSubCategorySearchQuery("");
+                        setSelectedSubCategoryFilter(null);
+                      }}
+                      className="flex items-center gap-2 px-4 py-2.5 text-sm text-cream-700 hover:text-cream-900 bg-cream-100 hover:bg-cream-200 rounded-lg transition-colors whitespace-nowrap"
                     >
-                      <X size={18} />
+                      <X size={16} />
+                      Clear Filters
                     </button>
                   )}
                 </div>
-
-                {/* Subcategory Dropdown */}
-                <div className="flex-1 sm:flex-initial sm:w-64">
-                  <label className="block text-sm font-semibold text-cream-900 mb-2">
-                    Filter Subcategory
-                  </label>
-                  <ReviewFilterDropdown
-                    label="All Subcategories"
-                    value={selectedSubCategoryFilter}
-                    onChange={(value) => setSelectedSubCategoryFilter(value as string | null)}
-                    options={[
-                      { value: null, label: "All Subcategories" },
-                      ...subCategories
-                        .filter(subCat => {
-                          if (subCategorySearchQuery && !subCat.name.toLowerCase().includes(subCategorySearchQuery.toLowerCase())) {
-                            return false;
-                          }
-                          return true;
-                        })
-                        .map(subCat => ({
-                          value: subCat._id,
-                          label: subCat.name
-                        })),
-                    ]}
-                    className="w-full"
-                  />
-                </div>
-
-                {/* Clear Filters Button */}
-                {(subCategorySearchQuery || selectedSubCategoryFilter) && (
-                  <button
-                    onClick={() => {
-                      setSubCategorySearchQuery("");
-                      setSelectedSubCategoryFilter(null);
-                    }}
-                    className="flex items-center gap-2 px-4 py-2.5 text-sm text-cream-700 hover:text-cream-900 bg-cream-100 hover:bg-cream-200 rounded-lg transition-colors whitespace-nowrap"
-                  >
-                    <X size={16} />
-                    Clear Filters
-                  </button>
-                )}
               </div>
-            </div>
+            )}
 
             {/* Subcategories Grid - Show when category has child categories - Same UI as provided */}
             <motion.div
@@ -1036,79 +1043,110 @@ const VisitingCards: React.FC = () => {
                 <h2 className="font-serif text-2xl sm:text-3xl font-bold text-cream-900 mb-6">
                   Direct Products
                 </h2>
-                <motion.div
-                  className="space-y-3 sm:space-y-4 w-full"
-                  variants={containerVariants}
-                  initial="hidden"
-                  animate="visible"
-                >
-                  {products.map((product) => {
-                    const productSubcategory = typeof product.subcategory === "object" 
-                      ? product.subcategory 
-                      : null;
-                    const productSubcategoryId = productSubcategory?.slug || productSubcategory?._id || 
-                      categoryId;
-                    
-                    const basePrice = product.basePrice || 0;
-                    const displayPrice = basePrice < 1 
-                      ? (basePrice * 1000).toFixed(2)
-                      : basePrice.toFixed(2);
-                    const priceLabel = basePrice < 1 ? "per 1000 units" : "";
-                    
-                    const descriptionText = product.description 
-                      ? product.description.replace(/<[^>]*>/g, '').trim()
-                      : "";
-                    const lines = descriptionText.split('\n').filter(line => line.trim());
-                    const firstFewLines = lines.slice(0, 3).join(' ').trim();
-                    const shortDescription = firstFewLines.length > 200 
-                      ? firstFewLines.substring(0, 200) + '...' 
-                      : firstFewLines || "";
-                    
-                    return (
+                
+                {/* Main Layout: 50/50 Split - Left Category Image, Right Products */}
+                <div className="flex flex-col lg:flex-row gap-6 sm:gap-8 lg:gap-12 min-h-[600px]">
+                  {/* Left Side: Category Image (Fixed, Large) */}
+                  <div className="lg:w-1/2">
+                    <div className="lg:sticky lg:top-24">
                       <motion.div
-                        key={product._id}
-                        variants={itemVariants}
+                        className="bg-white p-4 sm:p-6 md:p-8 lg:p-12 rounded-2xl sm:rounded-3xl shadow-sm border border-cream-100 flex items-center justify-center min-h-[400px] sm:min-h-[500px] md:min-h-[600px] bg-cream-100/50"
+                        initial={{ opacity: 0, x: -20 }}
+                        animate={{ opacity: 1, x: 0 }}
+                        transition={{ duration: 0.5 }}
                       >
-                        <Link 
-                          to={categoryId && productSubcategoryId
-                            ? `/digital-print/${categoryId}/${productSubcategoryId}/${product._id}`
-                            : categoryId
-                            ? `/digital-print/${categoryId}/${product._id}`
-                            : `/digital-print/${product._id}`
-                          } 
-                          className="group block w-full"
-                        >
-                          <div className="w-full p-4 sm:p-6 rounded-xl border-2 border-cream-200 hover:border-cream-900 text-left transition-all duration-200 hover:bg-cream-50 min-h-[140px] sm:min-h-[160px] flex flex-col">
-                            <div className="flex items-start justify-between gap-3 mb-3">
-                              <h3 className="font-serif text-base sm:text-lg font-bold text-cream-900 group-hover:text-cream-600 transition-colors flex-1">
-                                {product.name}
-                              </h3>
-                              <div className="text-right flex-shrink-0 flex items-center gap-2">
-                                <div>
-                                  <div className="text-lg sm:text-xl font-bold text-cream-900">
-                                    ₹{displayPrice}
-                                  </div>
-                                  {priceLabel && (
-                                    <div className="text-xs text-cream-500 mt-0.5">
-                                      {priceLabel}
-                                    </div>
-                                  )}
-                                </div>
-                                <span className="text-cream-900 group-hover:text-cream-600 text-xl font-bold transition-colors">→</span>
-                              </div>
-                            </div>
-                            
-                            {shortDescription && (
-                              <div className="text-cream-600 text-xs sm:text-sm mb-2 leading-relaxed flex-grow">
-                                <p className="line-clamp-3">{shortDescription}</p>
-                              </div>
-                            )}
-                          </div>
-                        </Link>
+                        <div className="w-full h-full flex items-center justify-center">
+                          <img
+                            src={categoryImage || "/Glossy.png"}
+                            alt={categoryName || "Category Preview"}
+                            className="w-full h-full object-contain cursor-pointer hover:opacity-90 transition-opacity rounded-lg"
+                            style={{ 
+                              maxWidth: '100%',
+                              maxHeight: '100%',
+                            }}
+                          />
+                        </div>
                       </motion.div>
-                    );
-                  })}
-                </motion.div>
+                    </div>
+                  </div>
+
+                  {/* Right Side: Product List */}
+                  <div className="lg:w-1/2">
+                    <motion.div
+                      className="space-y-3 sm:space-y-4 w-full"
+                      variants={containerVariants}
+                      initial="hidden"
+                      animate="visible"
+                    >
+                      {products.map((product) => {
+                        const productSubcategory = typeof product.subcategory === "object" 
+                          ? product.subcategory 
+                          : null;
+                        const productSubcategoryId = productSubcategory?.slug || productSubcategory?._id || 
+                          categoryId;
+                        
+                        const basePrice = product.basePrice || 0;
+                        const displayPrice = basePrice < 1 
+                          ? (basePrice * 1000).toFixed(2)
+                          : basePrice.toFixed(2);
+                        const priceLabel = basePrice < 1 ? "per 1000 units" : "";
+                        
+                        const descriptionText = product.description 
+                          ? product.description.replace(/<[^>]*>/g, '').trim()
+                          : "";
+                        const lines = descriptionText.split('\n').filter(line => line.trim());
+                        const firstFewLines = lines.slice(0, 3).join(' ').trim();
+                        const shortDescription = firstFewLines.length > 200 
+                          ? firstFewLines.substring(0, 200) + '...' 
+                          : firstFewLines || "";
+                        
+                        return (
+                          <motion.div
+                            key={product._id}
+                            variants={itemVariants}
+                          >
+                            <Link 
+                              to={categoryId && productSubcategoryId
+                                ? `/digital-print/${categoryId}/${productSubcategoryId}/${product._id}`
+                                : categoryId
+                                ? `/digital-print/${categoryId}/${product._id}`
+                                : `/digital-print/${product._id}`
+                              } 
+                              className="group block w-full"
+                            >
+                              <div className="w-full p-4 sm:p-6 rounded-xl border-2 border-cream-200 hover:border-cream-900 text-left transition-all duration-200 hover:bg-cream-50 min-h-[140px] sm:min-h-[160px] flex flex-col">
+                                <div className="flex items-start justify-between gap-3 mb-3">
+                                  <h3 className="font-serif text-base sm:text-lg font-bold text-cream-900 group-hover:text-cream-600 transition-colors flex-1">
+                                    {product.name}
+                                  </h3>
+                                  <div className="text-right flex-shrink-0 flex items-center gap-2">
+                                    <div>
+                                      <div className="text-lg sm:text-xl font-bold text-cream-900">
+                                        ₹{displayPrice}
+                                      </div>
+                                      {priceLabel && (
+                                        <div className="text-xs text-cream-500 mt-0.5">
+                                          {priceLabel}
+                                        </div>
+                                      )}
+                                    </div>
+                                    <span className="text-cream-900 group-hover:text-cream-600 text-xl font-bold transition-colors">→</span>
+                                  </div>
+                                </div>
+                                
+                                {shortDescription && (
+                                  <div className="text-cream-600 text-xs sm:text-sm mb-2 leading-relaxed flex-grow">
+                                    <p className="line-clamp-3">{shortDescription}</p>
+                                  </div>
+                                )}
+                              </div>
+                            </Link>
+                          </motion.div>
+                        );
+                      })}
+                    </motion.div>
+                  </div>
+                </div>
               </div>
             )}
           </>
@@ -1126,9 +1164,10 @@ const VisitingCards: React.FC = () => {
                     } else {
                       navigate('/digital-print');
                     }
+                    window.scrollTo(0, 0);
                   }}
-                  fallbackPath="/digital-print"
-                  label={`Back to ${categoryName || 'Categories'}`}
+                  fallbackPath={categoryId ? `/digital-print/${categoryId}` : "/digital-print"}
+                  label={categoryName ? `Back to ${categoryName}` : "Back to Category"}
                   className="inline-flex items-center gap-2 text-sm text-cream-600 hover:text-cream-900"
                 />
               </div>
@@ -1261,9 +1300,10 @@ const VisitingCards: React.FC = () => {
                   } else {
                     navigate('/digital-print');
                   }
+                  window.scrollTo(0, 0);
                 }}
-                fallbackPath="/digital-print"
-                label="Back to subcategories"
+                fallbackPath={categoryId ? `/digital-print/${categoryId}` : "/digital-print"}
+                label={categoryName ? `Back to ${categoryName}` : "Back to Category"}
                 className="text-cream-900 hover:text-cream-600 underline mt-2 inline-block"
               />
             )}
@@ -1369,9 +1409,10 @@ const VisitingCards: React.FC = () => {
                   } else {
                     navigate('/digital-print');
                   }
+                  window.scrollTo(0, 0);
                 }}
-                fallbackPath="/digital-print"
-                label="Back to subcategories"
+                fallbackPath={categoryId ? `/digital-print/${categoryId}` : "/digital-print"}
+                label={categoryName ? `Back to ${categoryName}` : "Back to Category"}
                 className="text-cream-900 hover:text-cream-600 underline mt-2 inline-block"
               />
             )}
